@@ -1,0 +1,304 @@
+import flask
+from flask import request
+from flask_cors import CORS
+from flask import json
+from flask import Response
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+import seaborn as sb
+from sklearn import metrics
+from sklearn.preprocessing import RobustScaler
+from sklearn.metrics import classification_report
+from sklearn.model_selection import train_test_split
+from collections import Counter
+from imblearn.over_sampling import SMOTE
+from sklearn.linear_model import LogisticRegression
+from sklearn.metrics import precision_score,recall_score
+from matplotlib import rcParams
+rcParams["figure.figsize"]=15,15
+import warnings
+warnings.filterwarnings("ignore")
+
+app = flask.Flask(__name__)
+app.config["DEBUG"] = True
+CORS(app)
+
+
+@app.route('/', methods=['POST'])
+def home():
+   # response = request.get("www.coreinfosoft.com")
+ if request.method == 'POST':
+    txtBxPregnancies = request.form['txtBxPregnancies']
+    txtBxGlucose = request.form['txtBxGlucose']
+    txtBxBloodPressure = request.form['txtBxBloodPressure']
+    txtBxSkinThickness = request.form['txtBxSkinThickness']
+    txtBxInsulin = request.form['txtBxInsulin']
+    txtBxBMI = request.form['txtBxBMI']
+    txtBxDiabetesPedigreeFunction = request.form['txtBxDiabetesPedigreeFunction']
+    txtBxAge = request.form['txtBxAge']
+    Diabetes=pd.read_csv("C:\\Users\\Dell\\Documents\\Files\\Diabetes.csv") 
+    txtBxPregnancies = float(txtBxPregnancies)
+    txtBxGlucose=float(txtBxGlucose)
+    txtBxBloodPressure=float(txtBxBloodPressure)
+    txtBxSkinThickness=float(txtBxSkinThickness)
+    txtBxInsulin=float(txtBxInsulin)
+    txtBxBMI=float(txtBxBMI)
+    txtBxDiabetesPedigreeFunction=float(txtBxDiabetesPedigreeFunction)
+    txtBxAge=float(txtBxAge)
+    dummyoutput=1
+    data2={"Pregnancies":[txtBxPregnancies],"Glucose":[txtBxGlucose],"BloodPressure":[txtBxBloodPressure],"SkinThickness":[txtBxSkinThickness],"Insulin":[txtBxInsulin],"BMI":[txtBxBMI],"DiabetesPedigreeFunction":[txtBxDiabetesPedigreeFunction],"Age":[txtBxAge],"Outcome":[dummyoutput]}
+    X_console2=pd.DataFrame(data2)
+    Final_data_Frame=pd.concat([Diabetes,X_console2],ignore_index=True,axis=0)
+    print(Final_data_Frame)
+   #  Final_data_Frame['Glucose']=Final_data_Frame['Glucose'].replace(0,Final_data_Frame['Glucose'].mean())
+   #  Final_data_Frame['BloodPressure']=Final_data_Frame['BloodPressure'].replace(0,Final_data_Frame['BloodPressure'].mean())
+   #  Final_data_Frame['SkinThickness']=Final_data_Frame['SkinThickness'].replace(0,Final_data_Frame['SkinThickness'].mean())
+   #  Final_data_Frame['Insulin']=Final_data_Frame['Insulin'].replace(0,Final_data_Frame['Insulin'].mean())
+   #  Final_data_Frame['BMI']=Final_data_Frame['BMI'].replace(0,Final_data_Frame['BMI'].mean())
+   #  Final_data_Frame['DiabetesPedigreeFunction']=Final_data_Frame['DiabetesPedigreeFunction'].replace(0,Final_data_Frame['DiabetesPedigreeFunction'].mean())
+   #  Final_data_Frame['Age']=Final_data_Frame['Age'].replace(0,Final_data_Frame['Age'].mean())
+    #print(Final_data_Frame)
+    RScaler=RobustScaler()
+    Final_data_Frame.iloc[:,0:8]=RScaler.fit_transform(Final_data_Frame.iloc[:,0:8])
+    #print(Final_data_Frame)
+    X=Final_data_Frame.iloc[:,0:8]
+    y=Final_data_Frame.Outcome
+    sm = SMOTE(random_state=42)
+    X_res, y_res = sm.fit_sample(X,y)
+    classifier = LogisticRegression()
+    classifier.fit(X_res, y_res)
+    y_pred = classifier.predict(X_res)
+    y_pred1= classifier.predict(X)
+    y_pred2=pd.DataFrame(y_pred1)
+    y_pred2.columns=["Output"]
+    #print(y_pred2)
+    #print(y_pred2["Output"].value_counts())
+    Latest_input=pd.DataFrame(Final_data_Frame.iloc[768,0:8]).T
+    Output = classifier.predict(Latest_input)
+    print(Output)
+    joutput=Output.tolist()
+    print(joutput)
+    confusion_matrix = pd.crosstab(y_res,y_pred)
+   #print(confusion_matrix)
+    True_Negative=confusion_matrix.loc[0,0]
+    True_Positve=confusion_matrix.loc[1,1]
+    False_Negative=confusion_matrix.loc[0,1]
+    False_Positve=confusion_matrix.loc[1,0]
+    Total=True_Positve+True_Negative+False_Positve+False_Negative
+    Accuracy=((True_Positve+True_Negative)/Total)
+    Precision1=precision_score(y_res,y_pred,average="weighted")
+    Recall1=recall_score(y_res,y_pred,average="weighted")
+    Precision=Precision1.tolist()
+    Recall=Recall1.tolist()
+    data={
+       "Pregnancies":[txtBxPregnancies],
+       "Glucose":[txtBxGlucose],
+       "BloodPressure":[txtBxBloodPressure],
+       "SkinThickness":[txtBxSkinThickness],
+       "Insulin":[txtBxInsulin],
+       "BMI":[txtBxBMI],
+       "DiabetesPedigreeFunction":[txtBxDiabetesPedigreeFunction],
+       "Age":txtBxAge,
+       "Outcome":joutput,
+       "Accuracy":Accuracy,
+       "Precision":Precision,
+       "Recall":Recall}
+    #print(feature_importance)
+    #print(Accuracy)
+    js = json.dumps(data)
+    #print(js)
+    resp = Response(js, status=200, mimetype='application/json')
+    #print(resp)
+    #resp.headers['Link'] = 'http://localhost:5000/'
+    return resp
+@app.route('/getGlucoseData', methods=['POST'])
+def getGlucoseData():
+   if request.method == 'POST':
+      Diabetes=pd.read_csv("C:\\Users\\Dell\\Documents\\Files\\Diabetes.csv")
+      GlucoseOrginal=Diabetes.iloc[:,1]
+      Outcome=Diabetes.iloc[:,8]
+      Outcome=Outcome.tolist()
+      GlucoseOrginal=GlucoseOrginal.tolist()
+      data={"glucose":GlucoseOrginal,"output":Outcome}
+      js = json.dumps(data)
+      resp = Response(js, status=200, mimetype='application/json')
+   return resp
+@app.route('/getBMIData', methods=['POST'])
+def getBMIData():
+   if request.method == 'POST':
+      Diabetes=pd.read_csv("C:\\Users\\Dell\\Documents\\Files\\Diabetes.csv")
+      BMIOrginal=Diabetes.iloc[:,5]
+      Outcome=Diabetes.iloc[:,8]
+      Outcome=Outcome.tolist()
+      BMIOrginal=BMIOrginal.tolist()
+      data={"bmi":BMIOrginal,"output":Outcome}
+      js = json.dumps(data)
+      resp = Response(js, status=200, mimetype='application/json')
+   return resp
+@app.route('/getPedigreeData', methods=['POST'])
+def getPedigreeData():
+   if request.method == 'POST':
+      Diabetes=pd.read_csv("C:\\Users\\Dell\\Documents\\Files\\Diabetes.csv")
+      PedigreeOrginal=Diabetes.iloc[:,6]
+      Outcome=Diabetes.iloc[:,8]
+      Outcome=Outcome.tolist()
+      PedigreeOrginal=PedigreeOrginal.tolist()
+      data={"pedigree":PedigreeOrginal,"output":Outcome}
+      js = json.dumps(data)
+      resp = Response(js, status=200, mimetype='application/json')
+   return resp
+@app.route('/getVarImpData', methods=['POST'])
+def getVarImpData():
+   if request.method == 'POST':
+      txtBxPregnancies = request.form['txtBxPregnancies']
+      txtBxGlucose = request.form['txtBxGlucose']
+      txtBxBloodPressure = request.form['txtBxBloodPressure']
+      txtBxSkinThickness = request.form['txtBxSkinThickness']
+      txtBxInsulin = request.form['txtBxInsulin']
+      txtBxBMI = request.form['txtBxBMI']
+      txtBxDiabetesPedigreeFunction = request.form['txtBxDiabetesPedigreeFunction']
+      txtBxAge = request.form['txtBxAge']
+      Diabetes=pd.read_csv("C:\\Users\\Dell\\Documents\\Files\\Diabetes.csv") 
+      txtBxPregnancies = float(txtBxPregnancies)
+      txtBxGlucose=float(txtBxGlucose)
+      txtBxBloodPressure=float(txtBxBloodPressure)
+      txtBxSkinThickness=float(txtBxSkinThickness)
+      txtBxInsulin=float(txtBxInsulin)
+      txtBxBMI=float(txtBxBMI)
+      txtBxDiabetesPedigreeFunction=float(txtBxDiabetesPedigreeFunction)
+      txtBxAge=float(txtBxAge)
+      dummyoutput=1
+      data2={"Pregnancies":[txtBxPregnancies],"Glucose":[txtBxGlucose],"BloodPressure":[txtBxBloodPressure],"SkinThickness":[txtBxSkinThickness],"Insulin":[txtBxInsulin],"BMI":[txtBxBMI],"DiabetesPedigreeFunction":[txtBxDiabetesPedigreeFunction],"Age":[txtBxAge],"Outcome":[dummyoutput]}
+      X_console2=pd.DataFrame(data2)
+      Final_data_Frame=pd.concat([Diabetes,X_console2],ignore_index=True,axis=0)
+      RScaler=RobustScaler()
+      Final_data_Frame.iloc[:,0:8]=RScaler.fit_transform(Final_data_Frame.iloc[:,0:8])
+      X=Final_data_Frame.iloc[:,0:8]
+      y=Final_data_Frame.Outcome
+      sm = SMOTE(random_state=42)
+      X_res, y_res = sm.fit_sample(X,y)
+      classifier = LogisticRegression()
+      classifier.fit(X_res, y_res)
+      y_pred = classifier.predict(X_res)
+      y_pred1= classifier.predict(X)
+      y_pred2=pd.DataFrame(y_pred1)
+      y_pred2.columns=["Output"]
+      Latest_input=pd.DataFrame(Final_data_Frame.iloc[768,0:8]).T
+      Output = classifier.predict(Latest_input)
+      joutput=Output.tolist()
+      confusion_matrix = pd.crosstab(y_res,y_pred)
+      True_Negative=confusion_matrix.loc[0,0]
+      True_Positve=confusion_matrix.loc[1,1]
+      False_Negative=confusion_matrix.loc[0,1]
+      False_Positve=confusion_matrix.loc[1,0]
+      Total=True_Positve+True_Negative+False_Positve+False_Negative
+      feature_importance=pd.DataFrame(np.hstack((np.array([X.columns[0:]]).T, classifier.coef_.T)), columns=['feature', 'importance'])
+      data={"feature":feature_importance['feature'].tolist(),"importance":feature_importance['importance'].tolist()}
+      js = json.dumps(data)
+      resp = Response(js, status=200, mimetype='application/json')
+   return resp
+@app.route('/getAccuracyData', methods=['POST'])
+def getAccuracyData():
+   if request.method == 'POST':
+      txtBxPregnancies = request.form['txtBxPregnancies']
+      txtBxGlucose = request.form['txtBxGlucose']
+      txtBxBloodPressure = request.form['txtBxBloodPressure']
+      txtBxSkinThickness = request.form['txtBxSkinThickness']
+      txtBxInsulin = request.form['txtBxInsulin']
+      txtBxBMI = request.form['txtBxBMI']
+      txtBxDiabetesPedigreeFunction = request.form['txtBxDiabetesPedigreeFunction']
+      txtBxAge = request.form['txtBxAge']
+      Diabetes=pd.read_csv("C:\\Users\\Dell\\Documents\\Files\\Diabetes.csv") 
+      txtBxPregnancies = float(txtBxPregnancies)
+      txtBxGlucose=float(txtBxGlucose)
+      txtBxBloodPressure=float(txtBxBloodPressure)
+      txtBxSkinThickness=float(txtBxSkinThickness)
+      txtBxInsulin=float(txtBxInsulin)
+      txtBxBMI=float(txtBxBMI)
+      txtBxDiabetesPedigreeFunction=float(txtBxDiabetesPedigreeFunction)
+      txtBxAge=float(txtBxAge)
+      dummyoutput=1
+      data2={"Pregnancies":[txtBxPregnancies],"Glucose":[txtBxGlucose],"BloodPressure":[txtBxBloodPressure],"SkinThickness":[txtBxSkinThickness],"Insulin":[txtBxInsulin],"BMI":[txtBxBMI],"DiabetesPedigreeFunction":[txtBxDiabetesPedigreeFunction],"Age":[txtBxAge],"Outcome":[dummyoutput]}
+      X_console2=pd.DataFrame(data2)
+      Final_data_Frame=pd.concat([Diabetes,X_console2],ignore_index=True,axis=0)
+      RScaler=RobustScaler()
+      Final_data_Frame.iloc[:,0:8]=RScaler.fit_transform(Final_data_Frame.iloc[:,0:8])
+      X=Final_data_Frame.iloc[:,0:8]
+      y=Final_data_Frame.Outcome
+      sm = SMOTE(random_state=42)
+      X_res, y_res = sm.fit_sample(X,y)
+      classifier = LogisticRegression()
+      classifier.fit(X_res, y_res)
+      y_pred = classifier.predict(X_res)
+      y_pred1= classifier.predict(X)
+      y_pred2=pd.DataFrame(y_pred1)
+      y_pred2.columns=["Output"]
+      Latest_input=pd.DataFrame(Final_data_Frame.iloc[768,0:8]).T
+      Output = classifier.predict(Latest_input)
+      joutput=Output.tolist()
+      confusion_matrix = pd.crosstab(y_res,y_pred)
+      True_Negative=confusion_matrix.loc[0,0].tolist()
+      True_Positve=confusion_matrix.loc[1,1].tolist()
+      False_Negative=confusion_matrix.loc[0,1].tolist()
+      False_Positve=confusion_matrix.loc[1,0].tolist()
+      Total=True_Positve+True_Negative+False_Positve+False_Negative
+      data={"True Positive":True_Positve,"False Positive":False_Positve,"True Negative":True_Negative,"False Negative":False_Negative}
+      js = json.dumps(data)
+      resp = Response(js, status=200, mimetype='application/json')
+   return resp 
+@app.route('/getROCData', methods=['POST'])
+def getROCData():
+   if request.method == 'POST':
+      txtBxPregnancies = request.form['txtBxPregnancies']
+      txtBxGlucose = request.form['txtBxGlucose']
+      txtBxBloodPressure = request.form['txtBxBloodPressure']
+      txtBxSkinThickness = request.form['txtBxSkinThickness']
+      txtBxInsulin = request.form['txtBxInsulin']
+      txtBxBMI = request.form['txtBxBMI']
+      txtBxDiabetesPedigreeFunction = request.form['txtBxDiabetesPedigreeFunction']
+      txtBxAge = request.form['txtBxAge']
+      Diabetes=pd.read_csv("C:\\Users\\Dell\\Documents\\Files\\Diabetes.csv") 
+      txtBxPregnancies = float(txtBxPregnancies)
+      txtBxGlucose=float(txtBxGlucose)
+      txtBxBloodPressure=float(txtBxBloodPressure)
+      txtBxSkinThickness=float(txtBxSkinThickness)
+      txtBxInsulin=float(txtBxInsulin)
+      txtBxBMI=float(txtBxBMI)
+      txtBxDiabetesPedigreeFunction=float(txtBxDiabetesPedigreeFunction)
+      txtBxAge=float(txtBxAge)
+      dummyoutput=1
+      data2={"Pregnancies":[txtBxPregnancies],"Glucose":[txtBxGlucose],"BloodPressure":[txtBxBloodPressure],"SkinThickness":[txtBxSkinThickness],"Insulin":[txtBxInsulin],"BMI":[txtBxBMI],"DiabetesPedigreeFunction":[txtBxDiabetesPedigreeFunction],"Age":[txtBxAge],"Outcome":[dummyoutput]}
+      X_console2=pd.DataFrame(data2)
+      Final_data_Frame=pd.concat([Diabetes,X_console2],ignore_index=True,axis=0)
+      RScaler=RobustScaler()
+      Final_data_Frame.iloc[:,0:8]=RScaler.fit_transform(Final_data_Frame.iloc[:,0:8])
+      X=Final_data_Frame.iloc[:,0:8]
+      y=Final_data_Frame.Outcome
+      sm = SMOTE(random_state=42)
+      X_res, y_res = sm.fit_sample(X,y)
+      classifier = LogisticRegression()
+      classifier.fit(X_res, y_res)
+      y_pred = classifier.predict(X_res)
+      y_pred1= classifier.predict(X)
+      y_pred2=pd.DataFrame(y_pred1)
+      y_pred2.columns=["Output"]
+      Latest_input=pd.DataFrame(Final_data_Frame.iloc[768,0:8]).T
+      Output = classifier.predict(Latest_input)
+      joutput=Output.tolist()
+      confusion_matrix = pd.crosstab(y_res,y_pred)
+      True_Negative=confusion_matrix.loc[0,0]
+      True_Positve=confusion_matrix.loc[1,1]
+      False_Negative=confusion_matrix.loc[0,1]
+      False_Positve=confusion_matrix.loc[1,0]
+      Total=True_Positve+True_Negative+False_Positve+False_Negative
+      fpr1, tpr1, threshold = metrics.roc_curve(y_res, y_pred)
+      fpr=fpr1.tolist()
+      tpr=tpr1.tolist()
+      data={"fpr":fpr,"tpr":tpr}
+      js = json.dumps(data)
+      resp = Response(js, status=200, mimetype='application/json')
+   return resp   
+   
+
+app.run()
